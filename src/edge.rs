@@ -1,6 +1,7 @@
 use crate::vertex::VertexId;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Edge {
-    pub dest: VertexId,
+    pub to: VertexId,
     pub weight: u32
 }

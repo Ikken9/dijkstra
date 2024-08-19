@@ -1,26 +1,7 @@
+use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
-use uuid::Uuid;
-use crate::edge::Edge;
 use crate::vertex::{Vertex, VertexId};
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-struct State {
-    cost: u32,
-    position: VertexId,
-}
-
-impl Ord for State {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cost.cmp(&self.cost)
-            .then_with(|| self.position.0.cmp(&other.position.0))
-    }
-}
-
-impl PartialOrd for State {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 pub struct Graph {
     pub vertices: HashMap<VertexId, Vertex>
@@ -33,110 +14,109 @@ impl Graph {
         }
     }
 
-    pub fn add_vertex(&mut self) {
-        let id = VertexId(Uuid::new_v4());
-        let vertex = Vertex { id, edges: Vec::new() };
-        self.vertices.insert(id, vertex);
+    pub fn add_vertex(&mut self, vertex: Vertex) {
+        let copy = vertex.clone();
+        let id = copy.id;
+        self.vertices.insert(id, copy);
     }
 
-    pub fn add_edge(&mut self, starting_vertex: VertexId, ending_vertex: VertexId, weight: u32) {
-        if let Some(v) = self.vertices.get_mut(&starting_vertex) {
-            v.edges.push( Edge {
-                dest: ending_vertex,
-                weight
-            })
-        }
-    }
+    pub fn dijkstra_heap(&mut self, start: Vertex) {
+        let mut distances: HashMap<VertexId, (u32, Vec<VertexId>)> = HashMap::new();
+        let mut visited: HashSet<VertexId> = HashSet::new();
 
-    pub fn dijkstra(&self, start: VertexId, goal: VertexId) -> Option<Vec<VertexId>> {
-        let mut dist: HashMap<VertexId, u32> = HashMap::new();
-        let mut prev: HashMap<VertexId, Option<VertexId>> = HashMap::new();
-        let mut unvisited: HashSet<VertexId> = HashSet::new();
+        let mut priority_queue = BinaryHeap::new();
 
-        for node_id in self.vertices.keys() {
-            dist.insert(*node_id, u32::MAX);
-            prev.insert(*node_id, None);
-            unvisited.insert(*node_id);
-        }
-        dist.insert(start, 0);
+        distances.insert(start.id.clone(), (0, vec![start.id.clone()]));
+        priority_queue.push(State { cost: 0, vertex: start.clone() });
 
-        while !unvisited.is_empty() {
-            let current = match unvisited.iter().min_by_key(|&&node_id| dist.get(&node_id).unwrap_or(&u32::MAX)) {
-                Some(&node_id) => node_id,
-                None => break,
-            };
-
-            if current == goal {
-                let mut path = Vec::new();
-                let mut u = goal;
-                while let Some(prev_node) = prev.get(&u).and_then(|&p| p) {
-                    path.push(u);
-                    u = prev_node;
-                }
-                path.push(start);
-                path.reverse();
-                return Some(path);
-            }
-
-            unvisited.remove(&current);
-
-            if let Some(node) = self.vertices.get(&current) {
-                for edge in &node.edges {
-                    let next = edge.dest;
-                    let new_dist = dist.get(&current).unwrap_or(&u32::MAX) + edge.weight;
-
-                    if new_dist < *dist.get(&next).unwrap_or(&u32::MAX) {
-                        dist.insert(next, new_dist);
-                        prev.insert(next, Some(current));
-                    }
-                }
-            }
-        }
-
-        None
-    }
-
-    fn dijkstra_heap(&self, start: VertexId, goal: VertexId) -> Option<Vec<VertexId>> {
-        let mut dist: HashMap<VertexId, u32> = HashMap::new();
-        let mut heap = BinaryHeap::new();
-        let mut predecessors: HashMap<VertexId, VertexId> = HashMap::new();
-
-        dist.insert(start, 0);
-        heap.push(State { cost: 0, position: start });
-
-        while let Some(State { cost, position }) = heap.pop() {
-            if position == goal {
-                let mut path = Vec::new();
-                let mut current = goal;
-                while let Some(&prev) = predecessors.get(&current) {
-                    path.push(current);
-                    current = prev;
-                }
-                path.push(start);
-                path.reverse();
-                return Some(path);
-            }
-
-            if cost > *dist.get(&position).unwrap_or(&u32::MAX) {
+        while let Some(State { cost: current_distance, vertex: current_vertex }) = priority_queue.pop() {
+            if !visited.insert(current_vertex.id) {
                 continue;
             }
 
-            if let Some(node) = self.vertices.get(&position) {
-                for edge in &node.edges {
-                    let next = State {
-                        cost: cost + edge.weight,
-                        position: edge.dest,
-                    };
+            for neighbor in &current_vertex.edges {
+                if let Some(next) = self.vertices.get(&neighbor.to) {
+                    let current_path = distances.get(&current_vertex.id).unwrap().1.clone();
+                    let distance = current_distance + neighbor.weight;
 
-                    if next.cost < *dist.get(&next.position).unwrap_or(&u32::MAX) {
-                        heap.push(next);
-                        dist.insert(next.position, next.cost);
-                        predecessors.insert(next.position, position);
+                    if distance < distances.get(&neighbor.to).unwrap_or(&(u32::MAX, vec![])).0 || !distances.contains_key(&neighbor.to) {
+                        let mut new_path = current_path.clone();
+                        new_path.push(neighbor.to.clone());
+                        distances.insert(neighbor.to.clone(), (distance, new_path));
+
+                        // Push the neighbor to the priority queue
+                        priority_queue.push(State {
+                            cost: distance,
+                            vertex: next.clone(),
+                        });
                     }
                 }
             }
         }
 
-        None
+        for (to, (cost, path)) in distances {
+            println!("\nFrom vertex \'{}\' to vertex \'{}\':", start.id, to);
+            println!("  Cost: {}", cost);
+            println!("  Path: {:?}", path);
+        }
+    }
+
+    pub fn dijkstra_no_heap(&mut self, start: Vertex) {
+        let mut distances: HashMap<VertexId, u32> = HashMap::new();
+        let mut visited: HashSet<VertexId> = HashSet::new();
+
+        distances.insert(start.id, 0);
+
+        let mut current_vertex = start.clone();
+        let graph_size = self.vertices.keys().len();
+
+        while visited.len() < graph_size {
+            visited.insert(current_vertex.id);
+
+            let current_distance = *distances.get(&current_vertex.id).unwrap_or(&u32::MAX);
+
+            for neighbor in &current_vertex.edges {
+                let distance = current_distance + neighbor.weight;
+
+                if distance < *distances.get(&neighbor.to).unwrap_or(&u32::MAX) {
+                    distances.insert(neighbor.to, distance);
+                }
+            }
+
+            let next_vertex = self.vertices
+                .iter()
+                .filter(|(_, v)| !visited.contains(&v.id))
+                .min_by_key(|(_, v)| distances.get(&v.id).unwrap_or(&u32::MAX))
+                .map(|(_, v)| v.clone());
+
+            match next_vertex {
+                Some(v) => current_vertex = v,
+                None => break,
+            }
+        }
+
+        for (to, cost) in distances {
+            println!("From vertex \'{}\' to vertex \'{}\', cost: {}", start.id, to, cost)
+        }
+    }
+}
+
+
+
+#[derive(Eq, PartialEq)]
+struct State {
+    cost: u32,
+    vertex: Vertex,
+}
+
+impl Ord for State {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.cost.cmp(&self.cost)
+    }
+}
+
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
