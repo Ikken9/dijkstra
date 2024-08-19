@@ -21,12 +21,12 @@ impl Graph {
     }
 
     pub fn dijkstra_heap(&mut self, start: Vertex) {
-        let mut distances: HashMap<VertexId, (u32, Vec<VertexId>)> = HashMap::new();
+        let mut distances: HashMap<VertexId, u32> = HashMap::new();
         let mut visited: HashSet<VertexId> = HashSet::new();
 
         let mut priority_queue = BinaryHeap::new();
 
-        distances.insert(start.id.clone(), (0, vec![start.id.clone()]));
+        distances.insert(start.id.clone(), 0);
         priority_queue.push(State { cost: 0, vertex: start.clone() });
 
         while let Some(State { cost: current_distance, vertex: current_vertex }) = priority_queue.pop() {
@@ -36,15 +36,10 @@ impl Graph {
 
             for neighbor in &current_vertex.edges {
                 if let Some(next) = self.vertices.get(&neighbor.to) {
-                    let current_path = distances.get(&current_vertex.id).unwrap().1.clone();
                     let distance = current_distance + neighbor.weight;
+                    if distance < *distances.get(&neighbor.to).unwrap_or(&u32::MAX) {
+                        distances.insert(neighbor.to.clone(), distance);
 
-                    if distance < distances.get(&neighbor.to).unwrap_or(&(u32::MAX, vec![])).0 || !distances.contains_key(&neighbor.to) {
-                        let mut new_path = current_path.clone();
-                        new_path.push(neighbor.to.clone());
-                        distances.insert(neighbor.to.clone(), (distance, new_path));
-
-                        // Push the neighbor to the priority queue
                         priority_queue.push(State {
                             cost: distance,
                             vertex: next.clone(),
@@ -54,10 +49,9 @@ impl Graph {
             }
         }
 
-        for (to, (cost, path)) in distances {
+        for (to, cost) in distances {
             println!("\nFrom vertex \'{}\' to vertex \'{}\':", start.id, to);
             println!("  Cost: {}", cost);
-            println!("  Path: {:?}", path);
         }
     }
 
@@ -96,12 +90,11 @@ impl Graph {
         }
 
         for (to, cost) in distances {
-            println!("From vertex \'{}\' to vertex \'{}\', cost: {}", start.id, to, cost)
+            println!("\nFrom vertex \'{}\' to vertex \'{}\':", start.id, to);
+            println!("  Cost: {}", cost);
         }
     }
 }
-
-
 
 #[derive(Eq, PartialEq)]
 struct State {
