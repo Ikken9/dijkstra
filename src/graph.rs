@@ -27,23 +27,22 @@ impl Graph {
         let mut priority_queue = BinaryHeap::new();
 
         distances.insert(start.id.clone(), 0);
-        priority_queue.push(State { cost: 0, vertex: start.clone() });
+        priority_queue.push(State { vertex: start.id, cost: 0 });
 
-        while let Some(State { cost: current_distance, vertex: current_vertex }) = priority_queue.pop() {
-            if !visited.insert(current_vertex.id) {
+        while let Some(State { vertex: current_vertex, cost: current_distance }) = priority_queue.pop() {
+            if !visited.insert(current_vertex) {
                 continue;
             }
 
-            for neighbor in &current_vertex.edges {
+            println!("heap {:?}", visited);
+
+            for neighbor in &self.vertices.get(&current_vertex).unwrap().edges {
                 if let Some(next) = self.vertices.get(&neighbor.to) {
                     let distance = current_distance + neighbor.weight;
                     if distance < *distances.get(&neighbor.to).unwrap_or(&u32::MAX) {
                         distances.insert(neighbor.to.clone(), distance);
 
-                        priority_queue.push(State {
-                            cost: distance,
-                            vertex: next.clone(),
-                        });
+                        priority_queue.push(State { vertex: next.id, cost: distance });
                     }
                 }
             }
@@ -66,7 +65,7 @@ impl Graph {
 
         while visited.len() < graph_size {
             visited.insert(current_vertex.id);
-
+            println!("no heap {:?}", visited);
             let current_distance = *distances.get(&current_vertex.id).unwrap_or(&u32::MAX);
 
             for neighbor in &current_vertex.edges {
@@ -98,8 +97,8 @@ impl Graph {
 
 #[derive(Eq, PartialEq)]
 struct State {
-    cost: u32,
-    vertex: Vertex,
+    vertex: VertexId,
+    cost: u32
 }
 
 impl Ord for State {

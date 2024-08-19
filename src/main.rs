@@ -34,13 +34,13 @@ fn main() {
     graph.add_vertex(vertex_b);
     graph.add_vertex(vertex_c);
     graph.add_vertex(vertex_d);
-    graph.add_vertex(vertex_e);
+    graph.add_vertex(vertex_e.clone());
     graph.add_vertex(vertex_f);
     graph.add_vertex(vertex_g);
 
     println!("\nDijkstra's Algorithm implemented using a priority queue");
-    graph.dijkstra_heap(vertex_a.clone());
+    graph.dijkstra_heap(vertex_e.clone());
 
     println!("\nDijkstra's Algorithm implemented without using a priority queue");
-    graph.dijkstra_no_heap(vertex_a.clone());
+    graph.dijkstra_no_heap(vertex_e.clone());
 }
